@@ -11,7 +11,7 @@ def main():
 
     # create the bot application (object)
     application = ApplicationBuilder().token(
-        '7735203801:AAGwegnbEhqjLWGI-3QgmLz3iM53TvPShaU').build()
+        '').build()
 
     create_df = CommandHandler('simulate', mm.random_spents)
     application.add_handler(create_df)
