@@ -1,16 +1,39 @@
 import sqlite3
 from datetime import date
+import logging
+import os
 
+logger = logging.getLogger(__name__)
 
-class mm_db:
-    def __init__(self, db_name='expenses.db'):
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
-        self._create_tables()
+class Database_Manager:
+    def __init__(self, db_name):
+        logger.info(f"Initializing database connection to {db_name}")
+        self.db_name = db_name
+
+        # Ensure the directory for the database file exists
+        db_dir = os.path.dirname(self.db_name)
+        if db_dir and not os.path.exists(db_dir): # Check if db_dir is not empty and if it exists
+            try:
+                os.makedirs(db_dir, exist_ok=True) # Create the directory if it doesn't exist
+                logger.info(f"Created database directory: {db_dir}")
+            except OSError as e:
+                logger.error(f"Error creating database directory {db_dir}: {e}")
+                # Depending on how critical this is, you might want to raise the error
+                # or handle it in a way that allows the app to continue (e.g., fallback to in-memory DB)
+                raise # Re-raise the exception if directory creation is critical
+
+        # Connect to the database. This will create the file if it doesn't exist in the specified path.
+        try:
+            self.conn = sqlite3.connect(self.db_name)
+            self.cursor = self.conn.cursor()
+            self._create_tables()
+        except sqlite3.Error as e:
+            logger.error(f"Error connecting to or initializing database {self.db_name}: {e}")
+            raise # Re-raise the exception as this is critical
 
     def _create_tables(self):
         # Create expenses table if it doesn't exist
-        self.cursor.execute('''
+        self.cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY,
                 item TEXT,
@@ -105,7 +128,7 @@ class mm_db:
 
     def del_last(self):
         self.cursor.execute(
-            "DELETE FROM expenses WHERE id = (SELECT id FROM your_table ORDER BY id DESC LIMIT 1)"
+            "DELETE FROM expenses WHERE id = (SELECT id FROM expenses ORDER BY id DESC LIMIT 1)"
         )
 
     def clear_expenses(self):

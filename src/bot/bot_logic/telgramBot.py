@@ -2,67 +2,21 @@ import logging
 import pandas as pd
 import numpy as np
 from datetime import date
-from typing import Optional, Tuple
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from dbm import mm_db
+from telegram.ext import ContextTypes
+from services.databaseManager import Database_Manager
+from services.auxFunctions import parse_date_args
 
+logger = logging.getLogger(__name__)
 
-def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
-    """Parse command arguments into day, month, year."""
-    today = date.today()
-    if not args:
-        return today.day, today.month, today.year
+class MoneyMate():
 
-    # Convert all args to integers
-    try:
-        numbers = [int(arg) for arg in args]
-    except ValueError:
-        raise ValueError("All arguments must be numbers")
-
-    if len(numbers) == 1:
-        num = numbers[0]
-        if 1 <= num <= 12:
-            return None, num, today.year
-        elif 2020 <= num <= 2025:
-            return None, None, num
-        else:
-            raise ValueError(
-                "Single argument must be month (1-12) or year (2020-2025)")
-
-    elif len(numbers) == 2:
-        month, year = numbers
-        if 1 <= month <= 12 and 2023 <= year <= 2025:
-            return None, month, year
-        else:
-            raise ValueError("Format: month (1-12) year (2023-2025)")
-
-    elif len(numbers) == 3:
-        day, month, year = numbers
-        if 1 <= day <= 31 and 1 <= month <= 12 and 2023 <= year <= 2025:
-            return day, month, year
-        else:
-            raise ValueError(
-                "Format: day (1-31) month (1-12) year (2023-2025)")
-
-    raise ValueError("Invalid number of arguments")
-
-
-# this helps to know if there are any errors
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-
-class moneyMate:
-
-    def __init__(self):
+    def __init__(self, db_manager):
         # creates the object database manager
-        self.db = mm_db()
+        self.dataBase = db_manager
 
-    async def clear(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        self.db.clear_expenses()
+    async def clear(self):
+        self.dataBase.clear_expenses()
 
     async def random_spents(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Parameters for generating random data
@@ -92,22 +46,28 @@ class moneyMate:
         # Sorting by date for better usability
         df = df.sort_values(by="date").reset_index(drop=True)
 
-        df.to_sql('expenses', self.db.conn, if_exists='replace', index=False)
+        df.to_sql('expenses', self.dataBase.conn, if_exists='replace', index=False)
 
         await update.message.reply_text(text="Random spents generated")
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        spending = context.args
 
-        if not context.args:  # Check if args are empty
-            await update.message.reply_text(
-                text="🚫 No arguments provided 🚫\nTry this format: /add product, spent, category")
-            return
+        spending = update.message.text.split(" ")
 
-        spending = [i.replace(",", "") for i in context.args]
+        if ("," in "".join(spending)):
+            item = []
+            for i in spending:
+                if ("," not in i):
+                    item.append(i)
+                else:
+                    item.append(i.replace(",", ""))
+                    spending = spending[spending.index(i)+1:]
+                    break
+            spending.insert(0, " ".join(item))
+
         if len(spending) != 3:  # Check if the format is valid
             await update.message.reply_text(
-                text="🚫 Invalid format 🚫\nTry this format: /add product, spent, category")
+                text="🚫 Invalid format 🚫\nTry this format: product, spent, category")
             return
 
         item, amount, category = spending
@@ -118,13 +78,13 @@ class moneyMate:
                 text="🚫 Amount must be a number 🚫")
             return
 
-        self.db.add_expense(item, int(amount), category)
+        self.dataBase.add_expense(item, int(amount), category)
 
         await update.message.reply_text(
             text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {item.capitalize()}\n \t\t💰  ${amount:,.2f}\n \t\t📝  {category.capitalize()}\n\n ✅  Added successfully  ✅")
 
-        budget = self.db.get_budget(category)
-        spents = self.db.get_total_spent(category)
+        budget = self.dataBase.get_budget(category)
+        spents = self.dataBase.get_total_spent(category)
 
         if (budget > 0):
             if (budget - spents <= 0):
@@ -156,13 +116,13 @@ class moneyMate:
             day, month, year = parse_date_args(context.args)
 
             if day:
-                spent = self.db.get_sp_day(year, month, day)
+                spent = self.dataBase.get_sp_day(year, month, day)
             elif month:
-                spent = self.db.get_sp_month(year, month)
+                spent = self.dataBase.get_sp_month(year, month)
             elif year:
-                spent = self.db.get_sp_year(year)
+                spent = self.dataBase.get_sp_year(year)
             else:
-                spent = self.db.get_sp()
+                spent = self.dataBase.get_sp()
 
             spent = pd.DataFrame(
                 spent, columns=['id', 'item', 'amount', 'category', 'date'])
@@ -185,11 +145,11 @@ class moneyMate:
             return
 
     async def delete_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        self.db.del_last()
+        self.dataBase.del_last()
         await update.message.reply_text("Last expense deleted")
         return
 
-    async def cat_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def category_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '/budget [category] [budget]'
 
         message = context.args
@@ -198,7 +158,7 @@ class moneyMate:
             category, budget = message
 
             if (int(budget) >= 0):
-                self.db.set_budget(category, int(budget))
+                self.dataBase.set_budget(category, int(budget))
 
                 await update.message.reply_text(f"Budget correctly allocated  📊\n\nOn this month you only can spend ${budget} in {category}")
             else:
@@ -207,7 +167,7 @@ class moneyMate:
             await update.message.reply_text("Format not valid for a budget, try /budget [category] [budget]")
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        categories = self.db.get_categories()
+        categories = self.dataBase.get_categories()
 
         await update.message.reply_text(text=f"{categories.__str__}")
         return
