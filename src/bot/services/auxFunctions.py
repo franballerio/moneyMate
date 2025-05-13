@@ -1,9 +1,7 @@
-import logging
-import pandas as pd
-import numpy as np
 from datetime import date
 from typing import Optional, Tuple
-
+from telegram import Update
+from .models import Expense
 
 def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """Parse command arguments into day, month, year."""
@@ -43,3 +41,47 @@ def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
                 "Format: day (1-31) month (1-12) year (2023-2025)")
 
     raise ValueError("Invalid number of arguments")
+
+async def get_spending(update: Update):
+    try:
+        spending = update.message.text.split(" ")
+
+        if ("," in "".join(spending)):
+            item = []
+            for i in spending:
+                if ("," not in i):
+                    item.append(i)
+                else:
+                    item.append(i.replace(",", ""))
+                    spending = spending[spending.index(i)+1:]
+                    break
+            spending.insert(0, " ".join(item))
+            
+        try:
+            amount = int(amount)
+        except ValueError:  # Check if amount is a number
+            await update.message.reply_text(
+                text="🚫 Amount must be a number 🚫")
+            return
+        
+        await update.message.reply_text(text=f"{spending[0]}, {spending[1]}, {spending[2]}")
+        
+        spending = Expense(item=spending[0], amount=spending[2], category=spending[1])
+        
+        return spending
+    except:
+            await update.message.reply_text(text="🚫 Invalid format 🚫\nTry this format: product, spent, category")
+            
+def check_budget(category, bot, update: Update):
+    
+    budget = bot.dataBase.get_budget(category)
+    spents = bot.dataBase.get_total_spent(category)
+
+    if (budget > 0):
+        if (budget - spents <= 0):
+            update.message.reply_text(
+                text="🚫 You went over the budget 🚫")
+        else:
+            update.message.reply_text(
+                text=f"Your remaining budget for {category} is {budget - spents}")
+    return

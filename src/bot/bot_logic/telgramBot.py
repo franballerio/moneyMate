@@ -5,7 +5,9 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 from services.databaseManager import Database_Manager
-from services.auxFunctions import parse_date_args
+import services.auxFunctions as aux
+from services.models import Expense
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +15,7 @@ class MoneyMate():
 
     def __init__(self, db_manager):
         # creates the object database manager
-        self.dataBase = db_manager
+        self.dataBase: Database_Manager = db_manager
 
     async def clear(self):
         self.dataBase.clear_expenses()
@@ -52,47 +54,15 @@ class MoneyMate():
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        spending = update.message.text.split(" ")
-
-        if ("," in "".join(spending)):
-            item = []
-            for i in spending:
-                if ("," not in i):
-                    item.append(i)
-                else:
-                    item.append(i.replace(",", ""))
-                    spending = spending[spending.index(i)+1:]
-                    break
-            spending.insert(0, " ".join(item))
-
-        if len(spending) != 3:  # Check if the format is valid
-            await update.message.reply_text(
-                text="🚫 Invalid format 🚫\nTry this format: product, spent, category")
-            return
-
-        item, amount, category = spending
-        try:
-            amount = int(amount)
-        except ValueError:  # Check if amount is a number
-            await update.message.reply_text(
-                text="🚫 Amount must be a number 🚫")
-            return
-
-        self.dataBase.add_expense(item, int(amount), category)
-
+        spent: Expense = aux.get_spending(update)
+        
         await update.message.reply_text(
-            text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {item.capitalize()}\n \t\t💰  ${amount:,.2f}\n \t\t📝  {category.capitalize()}\n\n ✅  Added successfully  ✅")
+            text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
 
-        budget = self.dataBase.get_budget(category)
-        spents = self.dataBase.get_total_spent(category)
-
-        if (budget > 0):
-            if (budget - spents <= 0):
-                await update.message.reply_text(
-                    text="🚫 You went over the budget 🚫")
-            else:
-                await context.bot.send_message(
-                    text=f"Your remaining budget for {category} is {budget - spents}")
+        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
+        
+        aux.check_budget(spent.category, self, update)
+        
         return
 
     async def unknown(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -113,7 +83,7 @@ class MoneyMate():
         }
 
         try:
-            day, month, year = parse_date_args(context.args)
+            day, month, year = aux.parse_date_args(context.args)
 
             if day:
                 spent = self.dataBase.get_sp_day(year, month, day)
