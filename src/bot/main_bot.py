@@ -15,7 +15,8 @@ db_name = os.getenv("database_name")
 # Configure logging (good practice to have it in your main entry point)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    handlers=[logging.StreamHandler()] # To console
 )
 logger = logging.getLogger(__name__)
 

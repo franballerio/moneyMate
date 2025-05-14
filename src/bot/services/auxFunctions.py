@@ -1,7 +1,5 @@
 from datetime import date
 from typing import Optional, Tuple
-from telegram import Update
-from telegram.ext import ContextTypes
 from .models import Expense
 
 def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
@@ -43,22 +41,18 @@ def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
 
     raise ValueError("Invalid number of arguments")
            
-def check_budget(category, bot, update: Update, context: ContextTypes.DEFAULT_TYPE):
+def check_budget(budget, spents, spent_amount) -> int:
     
-    budget = bot.dataBase.get_budget(category)
-    spents = bot.dataBase.get_total_spent(category)
+    if budget == None:
+        return 1
 
     if (budget > 0):
-        if (budget - spents <= 0):
-            update.message.reply_text(
-                text="🚫 You went over the budget 🚫")
+        if (budget - spents - spent_amount <= 0):
+            return 0
         else:
-            update.message.reply_text(
-                text=f"Your remaining budget for {category} is {budget - spents}")
-            
-    return
+            return budget
 
-def get_spent(spent, update: Update, context: ContextTypes.DEFAULT_TYPE):
+def get_spent(spent) -> Expense | int:
     '''Creates an expense object and checks if the expense format is correct'''
     if ("," in "".join(spent)):
         item = []
@@ -72,13 +66,11 @@ def get_spent(spent, update: Update, context: ContextTypes.DEFAULT_TYPE):
         spent.insert(0, " ".join(item))
     
     if len(spent) != 3:
-        update.message.reply_text(f"🚫 Invalid format 🚫\nTry this format: product, spent, category")
-        return None
-        
+        return 0
+
     try:
         int(spent[1])
     except ValueError:  # Check if amount is a number
-        update.message.reply_text(f"🚫 Amount must be a number 🚫")
-        return None
+        return 1
 
     return Expense(item=spent[0], amount=int(spent[1]), category=spent[2])

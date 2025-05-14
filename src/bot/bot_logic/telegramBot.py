@@ -5,8 +5,10 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 from services.databaseManager import Database_Manager
-import services.auxFunctions as aux
-from services.models import Expense
+from services.auxFunctions import check_budget
+from services.auxFunctions import get_spent
+from services.auxFunctions import parse_date_args
+
 
 
 
@@ -56,17 +58,36 @@ class MoneyMate():
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         spent = update.message.text.split(" ")
+        # format spent like this [spent, amount, category] 
+        spent = get_spent(spent)
         
-        spent: Expense = aux.get_spent(spent, update, context)
-        
-        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
-        
-        await update.message.reply_text(
-            text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
+        if spent == 0:
+            await update.message.reply_text(f"🚫 Invalid format 🚫\nTry this format:\nproduct spent category\nyour product, spent, category")
+            return None
+        elif spent == 1:
+            await update.message.reply_text(f"🚫 Invalid format 🚫\nAmount must be a number")
+            return None
 
-        aux.check_budget(spent.category, self, update, context)
+        budget = self.dataBase.get_budget(spent.category) # get the budget
+        spents = self.dataBase.get_total_spents(spent.category) # get all the spents
         
-        return
+        budget = check_budget(budget, spents, spent.amount)
+        # it returns an error code or the category budget (if budget exists)
+        
+        if budget == 0:
+            await update.message.reply_text(text="🚫 You went over the budget 🚫")
+            return
+        else:   
+            if budget == 1:
+                await update.message.reply_text(text="Budget doesn't exist")
+            
+            self.dataBase.add_expense(spent.item, spent.amount, spent.category)
+            
+            await update.message.reply_text(
+                text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
+            await update.message.reply_text(
+                text=f"Your remaining budget for {spent.category} is {budget - spents - spent.amount}")
+            return
 
     async def unknown(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
@@ -86,16 +107,16 @@ class MoneyMate():
         }
 
         try:
-            day, month, year = aux.parse_date_args(context.args)
+            day, month, year = parse_date_args(context.args)
 
             if day:
-                spent = self.dataBase.get_sp_day(year, month, day)
+                spent = self.dataBase.get_expenses_by_day_month_year(year, month, day)
             elif month:
-                spent = self.dataBase.get_sp_month(year, month)
+                spent = self.dataBase.get_expenses_by_month_year(year, month)
             elif year:
-                spent = self.dataBase.get_sp_year(year)
+                spent = self.dataBase.get_expenses_by_year(year)
             else:
-                spent = self.dataBase.get_sp()
+                spent = self.dataBase.get_expenses_today()
 
             spent = pd.DataFrame(
                 spent, columns=['id', 'item', 'amount', 'category', 'date'])
@@ -140,7 +161,13 @@ class MoneyMate():
             await update.message.reply_text("Format not valid for a budget, try /budget [category] [budget]")
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        categories = self.dataBase.get_categories()
+        categories = self.dataBase.get_categories(self.dataBase)
 
         await update.message.reply_text(text=f"{categories.__str__}")
+        return
+
+    async def budgets(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        budgets_list = self.dataBase.get_budgets()
+
+        await update.message.reply_text(text=f"{budgets_list}")
         return
