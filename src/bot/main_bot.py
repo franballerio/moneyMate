@@ -1,6 +1,6 @@
 import logging
 from telegram.ext import ApplicationBuilder
-from bot_logic.telgramBot import MoneyMate
+from bot_logic.telegramBot import MoneyMate
 from services.databaseManager import Database_Manager
 from handlers import registerHandlers
 from dotenv import load_dotenv

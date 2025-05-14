@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Optional, Tuple
 from telegram import Update
+from telegram.ext import ContextTypes
 from .models import Expense
 
 def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
@@ -41,38 +42,8 @@ def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
                 "Format: day (1-31) month (1-12) year (2023-2025)")
 
     raise ValueError("Invalid number of arguments")
-
-async def get_spending(update: Update):
-    try:
-        spending = update.message.text.split(" ")
-
-        if ("," in "".join(spending)):
-            item = []
-            for i in spending:
-                if ("," not in i):
-                    item.append(i)
-                else:
-                    item.append(i.replace(",", ""))
-                    spending = spending[spending.index(i)+1:]
-                    break
-            spending.insert(0, " ".join(item))
-            
-        try:
-            amount = int(amount)
-        except ValueError:  # Check if amount is a number
-            await update.message.reply_text(
-                text="🚫 Amount must be a number 🚫")
-            return
-        
-        await update.message.reply_text(text=f"{spending[0]}, {spending[1]}, {spending[2]}")
-        
-        spending = Expense(item=spending[0], amount=spending[2], category=spending[1])
-        
-        return spending
-    except:
-            await update.message.reply_text(text="🚫 Invalid format 🚫\nTry this format: product, spent, category")
-            
-def check_budget(category, bot, update: Update):
+           
+def check_budget(category, bot, update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     budget = bot.dataBase.get_budget(category)
     spents = bot.dataBase.get_total_spent(category)
@@ -84,4 +55,30 @@ def check_budget(category, bot, update: Update):
         else:
             update.message.reply_text(
                 text=f"Your remaining budget for {category} is {budget - spents}")
+            
     return
+
+def get_spent(spent, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    '''Creates an expense object and checks if the expense format is correct'''
+    if ("," in "".join(spent)):
+        item = []
+        for i in spent:
+            if ("," not in i):
+                item.append(i)
+            else:
+                item.append(i.replace(",", ""))
+                spent = spent[spent.index(i)+1:]
+                break
+        spent.insert(0, " ".join(item))
+    
+    if len(spent) != 3:
+        update.message.reply_text(f"🚫 Invalid format 🚫\nTry this format: product, spent, category")
+        return None
+        
+    try:
+        int(spent[1])
+    except ValueError:  # Check if amount is a number
+        update.message.reply_text(f"🚫 Amount must be a number 🚫")
+        return None
+
+    return Expense(item=spent[0], amount=int(spent[1]), category=spent[2])

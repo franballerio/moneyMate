@@ -9,6 +9,7 @@ import services.auxFunctions as aux
 from services.models import Expense
 
 
+
 logger = logging.getLogger(__name__)
 
 class MoneyMate():
@@ -53,15 +54,17 @@ class MoneyMate():
         await update.message.reply_text(text="Random spents generated")
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-        spent: Expense = aux.get_spending(update)
+        
+        spent = update.message.text.split(" ")
+        
+        spent: Expense = aux.get_spent(spent, update, context)
+        
+        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
         
         await update.message.reply_text(
             text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
 
-        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
-        
-        aux.check_budget(spent.category, self, update)
+        aux.check_budget(spent.category, self, update, context)
         
         return
 
