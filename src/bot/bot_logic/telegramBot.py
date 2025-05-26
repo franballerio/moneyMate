@@ -5,7 +5,14 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 from services.databaseManager import Database_Manager
+from services.auxFunctions import check_budget
+from services.auxFunctions import get_spent
 from services.auxFunctions import parse_date_args
+from services.auxFunctions import format_df_itemized_to_monospaced_table
+from services.googleSheets import WorkSheet
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +20,8 @@ class MoneyMate():
 
     def __init__(self, db_manager):
         # creates the object database manager
-        self.dataBase = db_manager
+        self.dataBase: Database_Manager = db_manager
+        self.worksheet = WorkSheet()
 
     async def clear(self):
         self.dataBase.clear_expenses()
@@ -51,48 +59,41 @@ class MoneyMate():
         await update.message.reply_text(text="Random spents generated")
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        
+        spent = update.message.text.split(" ")
+        # format spent like this [spent, amount, category] 
+        spent = get_spent(spent)
+        
+        if spent == 0:
+            await update.message.reply_text(f"🚫 Invalid format 🚫\nTry this format:\nproduct spent category\nyour product, spent, category")
+            return None
+        elif spent == 1:
+            await update.message.reply_text(f"🚫 Invalid format 🚫\nAmount must be a number")
+            return None
 
-        spending = update.message.text.split(" ")
-
-        if ("," in "".join(spending)):
-            item = []
-            for i in spending:
-                if ("," not in i):
-                    item.append(i)
-                else:
-                    item.append(i.replace(",", ""))
-                    spending = spending[spending.index(i)+1:]
-                    break
-            spending.insert(0, " ".join(item))
-
-        if len(spending) != 3:  # Check if the format is valid
-            await update.message.reply_text(
-                text="🚫 Invalid format 🚫\nTry this format: product, spent, category")
+        budget = self.dataBase.get_budget(spent.category) # get the budget
+        spents = self.dataBase.get_total_spents(spent.category) # get all the spents
+        
+        budget = check_budget(budget, spents, spent.amount)
+        # it returns an error code or the category budget (if budget exists)
+        
+        if budget == 0:
+            await update.message.reply_text(text="🚫 You went over the budget 🚫")
             return
-
-        item, amount, category = spending
-        try:
-            amount = int(amount)
-        except ValueError:  # Check if amount is a number
-            await update.message.reply_text(
-                text="🚫 Amount must be a number 🚫")
-            return
-
-        self.dataBase.add_expense(item, int(amount), category)
-
+            
+        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
+        
+        self.worksheet.sheet_add(spent)
+        
         await update.message.reply_text(
-            text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {item.capitalize()}\n \t\t💰  ${amount:,.2f}\n \t\t📝  {category.capitalize()}\n\n ✅  Added successfully  ✅")
-
-        budget = self.dataBase.get_budget(category)
-        spents = self.dataBase.get_total_spent(category)
-
-        if (budget > 0):
-            if (budget - spents <= 0):
-                await update.message.reply_text(
-                    text="🚫 You went over the budget 🚫")
-            else:
-                await context.bot.send_message(
-                    text=f"Your remaining budget for {category} is {budget - spents}")
+            text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
+        
+        if budget == 1:
+                await update.message.reply_text(text="There isn't a budget set for this category")  
+        else:
+            await update.message.reply_text(
+                text=f"Your remaining budget for {spent.category} is ${budget - spents - spent.amount}")
+            
         return
 
     async def unknown(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -100,7 +101,7 @@ class MoneyMate():
             text="Sorry, I didn't understand that command.")
         return
 
-    async def balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def spent(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Calculate balance for given time period.
         Supports querying by: month, year, specific date, or month-year combination.
@@ -111,41 +112,34 @@ class MoneyMate():
                 "July", "August", "September", "October", "November", "December"
             ], 1)
         }
-
         try:
-            day, month, year = parse_date_args(context.args)
+            day, month, year = parse_date_args(tuple(context.args)) # returns day, month, year
 
-            if day:
-                spent = self.dataBase.get_sp_day(year, month, day)
-            elif month:
-                spent = self.dataBase.get_sp_month(year, month)
-            elif year:
-                spent = self.dataBase.get_sp_year(year)
+            if day and month and year:
+                spent = self.dataBase.get_expenses_by_day_month_year(year, month, day)
+                title = f"Spent on {day}/{month}/{year}"
             else:
-                spent = self.dataBase.get_sp()
+                spent = self.dataBase.get_expenses_today()
+                title = "Spent today"
 
-            spent = pd.DataFrame(
-                spent, columns=['id', 'item', 'amount', 'category', 'date'])
+            spent = pd.DataFrame(spent, columns=['id', 'item', 'amount', 'category', 'date'])
+            
+            spents = format_df_itemized_to_monospaced_table(spent, title)
 
-            command = update.message.text.split()[0]
-
-            if command == '/spent':
-                await update.message.reply_text(
-                    text=f"On {day, month, year} you spent in:\n{spent}")
-                return
-            if command == '/total':
-                await update.message.reply_text(f"You spent ${spent['amount'].sum():,.2f} on {day, month, year}")
-                return
+            await update.message.reply_text(
+                text=spents)
+            return
 
         except ValueError as e:
             await update.message.reply_text(str(e))
             return
         except Exception as e:
-            await update.message.reply_text("An error occurred while calculating your balance.")
+            await update.message.reply_text(str(e))
+            #await update.message.reply_text("An error occurred while calculating your balance.")
             return
 
     async def delete_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        self.dataBase.del_last()
+        self.dataBase.delete_last_expense()
         await update.message.reply_text("Last expense deleted")
         return
 
@@ -167,7 +161,13 @@ class MoneyMate():
             await update.message.reply_text("Format not valid for a budget, try /budget [category] [budget]")
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        categories = self.dataBase.get_categories()
+        categories = self.dataBase.get_categories(self.dataBase)
 
         await update.message.reply_text(text=f"{categories.__str__}")
+        return
+
+    async def budgets(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        budgets_list = self.dataBase.get_budgets()
+
+        await update.message.reply_text(text=f"{budgets_list}")
         return
