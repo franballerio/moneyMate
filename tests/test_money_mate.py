@@ -24,7 +24,7 @@ if src_path not in sys.path:
 # Ensure your file is named telegramBot.py and not telgramBot.py for these imports
 # If it's telgramBot.py, change the import accordingly.
 try:
-    from bot.services.models import Expense
+    from bot.services.expense import Expense
     from bot.services.auxFunctions import get_spending # This will test the corrected version
     from bot.bot_logic.telegramBot import add_spending, show_spending # Corrected to telgramBot.py as per user path
 except ImportError as e:
