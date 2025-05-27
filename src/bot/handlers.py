@@ -8,10 +8,11 @@ def registerHandlers(application, money_mate):
     spendings_handler = CommandHandler('add', money_mate.add_spending)
     spent = CommandHandler('spent', money_mate.spent)
     delete_handler = CommandHandler('undo', money_mate.delete_spending)
-    budget_handler = CommandHandler('budget', money_mate.category_budget)
+    set_budget_handler = CommandHandler('budget', money_mate.set_category_budget)
     budgets_handler = CommandHandler('budgets', money_mate.budgets)
     categ_handler = CommandHandler('categories', money_mate.categories)
-    # this should be at the end of the file, it tells the bot what to do when an unknown comoney_mateand is sent
+    
+    # this should be at the end of the file, it tells the bot what to do when an unknown command is sent
     # so this is triggered when the user sends a comoney_mateand that the bot doesn't know
     add_spending_handler = MessageHandler(filters.TEXT, money_mate.add_spending)
     unknown_command_handler = MessageHandler(filters.COMMAND, money_mate.unknown)
@@ -21,7 +22,7 @@ def registerHandlers(application, money_mate):
     application.add_handler(spendings_handler)
     application.add_handler(spent)
     application.add_handler(delete_handler)
-    application.add_handler(budget_handler)
+    application.add_handler(set_budget_handler)
     application.add_handler(budgets_handler)
     application.add_handler(categ_handler)
     application.add_handler(unknown_command_handler)

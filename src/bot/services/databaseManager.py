@@ -129,7 +129,6 @@ class Database_Manager:
             logger.error(f"Error getting total spent for {category}: {e}")
             return 0
 
-
     def get_all_expenses(self):
         try:
             self.cursor.execute("SELECT * FROM expenses ORDER BY date DESC")
@@ -157,7 +156,6 @@ class Database_Manager:
             logger.error(f"Error getting categories from expenses: {e}")
             return []
 
-    # Renamed from get_sp for clarity
     def get_expenses_today(self):
         today_str = date.today().isoformat() # YYYY-MM-DD
         try:
@@ -264,11 +262,12 @@ class Database_Manager:
             logger.error(f"Error clearing all budgets: {e}")
             return False
 
-    def close(self):
-        if self.conn:
-            logger.info(f"Closing database connection to {self.db_name}")
-            self.conn.close()
-            self.conn = None # Set to None to prevent further use
-        else:
-            logger.info("Database connection already closed or was never opened.")
+    # def close(self):
+        # if self.conn:
+        #     logger.info(f"Closing database connection to {self.db_name}")
+        #     self.conn.close()
+        #     self.conn = None # Set to None to prevent further use
+        # else:
+        #     logger.info("Database connection already closed or was never opened.")
+
 

@@ -15,10 +15,12 @@ class WorkSheet():
         
         self.__workSheet.get_worksheet(0).append_row(spent)
         self.__size =+ 1
-        
         return
     
     def sheet_del(self):        
         self.__workSheet.get_worksheet(0).delete_rows(self.__size)
-        
+        return
+    
+    def sheet_clear(self):
+        self.__workSheet.get_worksheet(0).clear()
         return
