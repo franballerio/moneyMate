@@ -1,7 +1,0 @@
-python-telegram-bot
-pandas
-numpy
-typing
-datetime
-telegram
-

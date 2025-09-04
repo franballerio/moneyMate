@@ -22,13 +22,12 @@ logger = logging.getLogger(__name__)
 
 def main():
     
-    db_manager = Database_Manager(db_name=db_name)
+    model = Database_Manager(db_name=db_name)
     
-    money_mate = MoneyMate(db_manager)
+    money_mate = MoneyMate(model)
     
         # create the bot application (object)
-    application = ApplicationBuilder().token(
-        bot_token).build()
+    application = ApplicationBuilder().token(bot_token).build()
     
     registerHandlers(application, money_mate)
     

@@ -4,15 +4,8 @@ import numpy as np
 from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
-from services.databaseManager import Database_Manager
-from services.auxFunctions import check_budget
-from services.auxFunctions import get_spent
-from services.auxFunctions import parse_date_args
-from services.auxFunctions import format_df_itemized_to_monospaced_table
-from services.googleSheets import WorkSheet
-
-
-
+import services.auxFunctions as aux
+#from services.googleSheets import WorkSheet
 
 logger = logging.getLogger(__name__)
 
@@ -20,50 +13,19 @@ class MoneyMate():
 
     def __init__(self, db_manager):
         # creates the object database manager
-        self.dataBase: Database_Manager = db_manager
-        self.worksheet = WorkSheet()
+        self.model= db_manager
+        #self.worksheet = WorkSheet()
 
     async def clear(self):
-        self.dataBase.clear_expenses()
-
-    async def random_spents(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Parameters for generating random data
-        categories = ["groceries", "so", "essentials",
-                      "clothes", "entertainment", "transport", "going out"]
-        start_date = "2023-01-01"
-        end_date = "2025-12-31"
-        num_records = 1000
-
-        # Generate random data
-        np.random.seed(42)  # For reproducibility
-        random_dates = pd.to_datetime(np.random.choice(
-            pd.date_range(start_date, end_date), size=num_records))
-        random_categories = np.random.choice(categories, size=num_records)
-        random_amounts = np.random.randint(100, 80001, size=num_records)
-        ids = list(range(1000))
-
-        # Create DataFrame
-        df = pd.DataFrame({
-            "id": ids,
-            "item": "Product",
-            "amount": random_amounts,
-            "category": random_categories,
-            "date": random_dates,
-        })
-
-        # Sorting by date for better usability
-        df = df.sort_values(by="date").reset_index(drop=True)
-
-        df.to_sql('expenses', self.dataBase.conn, if_exists='replace', index=False)
-
-        await update.message.reply_text(text="Random spents generated")
+        self.model.clear_expenses()
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         
-        spent = update.message.text.split(" ")
-        # format spent like this [spent, amount, category] 
-        spent = get_spent(spent)
+        data = update.message.text.split(" ")
+        # get spent like this [spent, amount, category], or error number
+        spent = aux.get_spent(data)
         
+        # add error handler
         if spent == 0:
             await update.message.reply_text(f"🚫 Invalid format 🚫\nTry this format:\nproduct spent category\nyour product, spent, category")
             return None
@@ -71,19 +33,19 @@ class MoneyMate():
             await update.message.reply_text(f"🚫 Invalid format 🚫\nAmount must be a number")
             return None
 
-        budget = self.dataBase.get_budget(spent.category) # get the budget
-        spents = self.dataBase.get_total_spents(spent.category) # get all the spents
+        budget = self.model.get_budget(spent.category) # get the budget
+        spents = self.model.get_total_spents(spent.category) # get all the spents
         
-        budget = check_budget(budget, spents, spent.amount)
+        budget = aux.check_budget(budget, spents, spent.amount)
         # it returns an error code or the category budget (if budget exists)
         
         if budget == 0:
             await update.message.reply_text(text="🚫 You went over the budget 🚫")
             return
             
-        self.dataBase.add_expense(spent.item, spent.amount, spent.category)
+        self.model.add_expense(spent.item, spent.amount, spent.category)
         
-        self.worksheet.sheet_add(spent)
+        # self.worksheet.sheet_add(spent)
         
         await update.message.reply_text(
             text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅")
@@ -113,18 +75,18 @@ class MoneyMate():
             ], 1)
         }
         try:
-            day, month, year = parse_date_args(tuple(context.args)) # returns day, month, year
+            day, month, year = aux.parse_date_args(tuple(context.args)) # returns day, month, year
 
             if day and month and year:
-                spent = self.dataBase.get_expenses_by_day_month_year(year, month, day)
+                spent = self.model.get_expenses_by_day_month_year(year, month, day)
                 title = f"Spent on {day}/{month}/{year}"
             else:
-                spent = self.dataBase.get_expenses_today()
+                spent = self.model.get_expenses_today()
                 title = "Spent today"
 
             spent = pd.DataFrame(spent, columns=['id', 'item', 'amount', 'category', 'date'])
             
-            spents = format_df_itemized_to_monospaced_table(spent, title)
+            spents = pd.DataFrame.to_json(spent)
 
             await update.message.reply_text(
                 text=spents)
@@ -139,7 +101,7 @@ class MoneyMate():
             return
 
     async def delete_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        self.dataBase.delete_last_expense()
+        self.model.delete_last_expense()
         await update.message.reply_text("Last expense deleted")
         return
 
@@ -152,7 +114,7 @@ class MoneyMate():
             category, budget = message
 
             if (int(budget) >= 0):
-                self.dataBase.set_budget(category, int(budget))
+                self.model.set_budget(category, int(budget))
 
                 await update.message.reply_text(f"Budget correctly allocated  📊\n\nOn this month you only can spend ${budget} in {category}")
             else:
@@ -161,13 +123,13 @@ class MoneyMate():
             await update.message.reply_text("Format not valid for a budget, try /budget [category] [budget]")
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        categories = self.dataBase.get_categories(self.dataBase)
+        categories = self.model.get_categories(self.model)
 
         await update.message.reply_text(text=f"{categories.__str__}")
         return
 
     async def budgets(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        budgets_list = self.dataBase.get_budgets()
+        budgets_list = self.model.get_budgets()
 
         await update.message.reply_text(text=f"{budgets_list}")
         return
