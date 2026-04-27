@@ -1,0 +1,5 @@
+python-telegram-bot==21.8
+python-dotenv==1.0.1
+pandas==2.2.2
+numpy==2.0.1
+gspread==6.1.1
