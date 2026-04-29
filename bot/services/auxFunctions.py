@@ -1,8 +1,16 @@
 import pandas as pd
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Optional, Tuple
-#from .expense import Expense
+
+
+@dataclass
+class Spent:
+    """Represents a spending transaction"""
+    item: str
+    amount: float
+    category: str
 
 def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """Parse command arguments into day, month, year."""
@@ -71,9 +79,8 @@ def get_spent(spent):
         return 0
 
     try:
-        int(spent[1])
+        amount = float(spent[1])
     except ValueError:  # Check if amount is a number
         return 1
 
-    #return Expense(item=spent[0], amount=int(spent[1]), category=spent[2])
-    return spent
+    return Spent(item=spent[0], amount=amount, category=spent[2])
