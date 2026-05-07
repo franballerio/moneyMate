@@ -51,16 +51,13 @@ def parse_date_args(args) -> Tuple[Optional[int], Optional[int], Optional[int]]:
 
     raise ValueError("Invalid number of arguments")
            
-def check_budget(budget, spents, spent_amount) -> int:
-    
-    if budget == None:
-        return 1
-
-    if (budget > 0):
-        if (budget - spents - spent_amount <= 0):
-            return 0
-        else:
-            return budget
+def check_budget(budget, spents, spent_amount):
+    if budget is None:
+        return None
+    remaining = budget - spents - spent_amount
+    if remaining <= 0:
+        return 0
+    return remaining
 
 def get_spent(spent):
     '''Creates an expense object and checks if the expense format is correct'''

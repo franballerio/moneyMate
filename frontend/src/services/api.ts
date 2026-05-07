@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import apiClient from './apiClient';
 
 export interface Expense {
-  id: string;
+  id: number;
   item: string;
   amount: number;
   category: string;
@@ -31,7 +31,7 @@ export interface Budget {
   category: string;
   limit_amount: number;
   period: 'monthly' | 'yearly';
-  spent: number;
+  spent?: number;
 }
 
 // Hook to fetch expenses
@@ -48,11 +48,11 @@ export const useExpenses = (page = 1, limit = 20) => {
         const response = await apiClient.get('/expenses', {
           params: { page, limit },
         });
-        setExpenses(response.data.data);
-        setTotal(response.data.total);
+        setExpenses(response.data.data.items || []);
+        setTotal(response.data.data.total || 0);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -77,8 +77,8 @@ export const useMetricsSummary = () => {
         const response = await apiClient.get('/metrics/summary');
         setMetrics(response.data.data);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -101,10 +101,10 @@ export const useCategoryMetrics = () => {
       try {
         setLoading(true);
         const response = await apiClient.get('/metrics/categories');
-        setCategories(response.data.data);
+        setCategories(response.data.data.categories || []);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -127,10 +127,10 @@ export const useTrends = () => {
       try {
         setLoading(true);
         const response = await apiClient.get('/metrics/trends');
-        setTrends(response.data.data);
+        setTrends(response.data.data.trends || []);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
@@ -153,10 +153,10 @@ export const useBudgets = () => {
       try {
         setLoading(true);
         const response = await apiClient.get('/budgets');
-        setBudgets(response.data.data);
+        setBudgets(response.data.data.items || []);
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }

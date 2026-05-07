@@ -3,29 +3,29 @@ import React from 'react';
 interface MetricCardProps {
   title: string;
   value: string;
-  icon: string;
-  color: 'blue' | 'green' | 'orange' | 'red';
+  icon?: React.ReactNode;
   trend?: string;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, value, icon, color, trend }) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    orange: 'bg-orange-50 text-orange-600 border-orange-200',
-    red: 'bg-red-50 text-red-600 border-red-200',
-  };
-
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, icon, trend }) => {
   return (
-    <div className={`${colorClasses[color]} border rounded-lg p-6 shadow-sm hover:shadow-md transition`}>
+    <div className="bg-canvas border border-hairline rounded-[18px] p-[24px] flex flex-col justify-between transition-shadow duration-300 hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
-          {trend && <p className="text-xs text-gray-500 mt-2">{trend}</p>}
+          <p className="text-caption-strong text-ink-muted-80 mb-1.5">{title}</p>
+          <p className="text-display-lg text-ink tracking-tight">{value}</p>
         </div>
-        <span className="text-4xl">{icon}</span>
+        {icon && (
+          <div className="w-9 h-9 rounded-full bg-surface-pearl flex items-center justify-center text-ink-muted-48 shrink-0">
+            {icon}
+          </div>
+        )}
       </div>
+      {trend && (
+        <p className="text-caption text-ink-muted-48 mt-4 pt-4 border-t border-divider-soft">
+          {trend}
+        </p>
+      )}
     </div>
   );
 };

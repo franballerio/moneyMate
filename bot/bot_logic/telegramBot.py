@@ -38,11 +38,13 @@ class MoneyMate:
         # self.worksheet = WorkSheet()
 
     async def clear(self):
-        self.model.clear_expenses()
+        self.model.clear_all_expenses()
 
     async def add_spending(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        data = update.message.text.split(",")  # split the message into a list of words
-        print(data)
+        text = update.message.text
+        if text.startswith("/"):
+            text = text.split(" ", 1)[1] if " " in text else ""
+        data = text.split(",")
         # get spent like this Spent(item, amount, category), or error number
         spent = aux.get_spent(data)
 
@@ -58,31 +60,28 @@ class MoneyMate:
             )
             return None
 
-        budget = self.model.get_budget(spent.category)  # get the budget
-        spents = self.model.get_total_spents(spent.category)  # get all the spents
+        budget = self.model.get_budget(spent.category)
+        spents = self.model.get_total_spents(spent.category)
 
-        budget = aux.check_budget(budget, spents, spent.amount)
-        # it returns an error code or the category budget (if budget exists)
+        remaining = aux.check_budget(budget, spents, spent.amount)
 
-        if budget == 0:
+        if remaining == 0:
             await update.message.reply_text(text="🚫 You went over the budget 🚫")
             return
 
         self.model.add_expense(spent.item, spent.amount, spent.category)
 
-        # self.worksheet.sheet_add(spent)
-
         await update.message.reply_text(
             text=f"💸  Spent  💸\n\n \t\t📅  {date.today()}\n \t\t📦  {spent.item.capitalize()}\n \t\t💰  ${spent.amount:,.2f}\n \t\t📝  {spent.category.capitalize()}\n\n ✅  Added successfully  ✅"
         )
 
-        if budget == 1:
+        if remaining is None:
             await update.message.reply_text(
                 text="There isn't a budget set for this category"
             )
         else:
             await update.message.reply_text(
-                text=f"Your remaining budget for {spent.category} is ${budget - spents - spent.amount}"
+                text=f"Your remaining budget for {spent.category} is ${remaining:,.2f}"
             )
 
         return
@@ -105,7 +104,7 @@ class MoneyMate:
                 title = "Spent today"
 
             spent = pd.DataFrame(
-                spent, columns=["id", "item", "amount", "category", "date"]
+                spent, columns=["id", "item", "amount", "category", "date", "created_by", "version", "deleted_at", "created_at", "updated_at"]
             )
 
             spents = pd.DataFrame.to_json(spent)
@@ -131,18 +130,20 @@ class MoneyMate:
 
         message = context.args
 
-        if (
-            len(message) == 2
-            and (type(int(message[1])) == int)
-            and (type(message[0]) == str)
-        ):
-            category, budget = message
+        if len(message) == 2:
+            try:
+                amount = int(message[1])
+            except ValueError:
+                await update.message.reply_text("Budget must be a number")
+                return
 
-            if int(budget) >= 0:
-                self.model.set_budget(category, int(budget))
+            category = message[0]
+
+            if amount >= 0:
+                self.model.set_budget(category, amount)
 
                 await update.message.reply_text(
-                    f"Budget correctly allocated  📊\n\nOn this month you only can spend ${budget} in {category}"
+                    f"Budget correctly allocated  📊\n\nOn this month you only can spend ${amount} in {category}"
                 )
             else:
                 await update.message.reply_text("Budget can't be less than 0")
@@ -152,9 +153,8 @@ class MoneyMate:
             )
 
     async def categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        categories = self.model.get_categories(self.model)
-
-        await update.message.reply_text(text=f"{categories.__str__}")
+        categories = self.model.get_categories()
+        await update.message.reply_text(text=str(categories))
         return
 
     async def budgets(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

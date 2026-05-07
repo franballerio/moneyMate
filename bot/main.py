@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    model = Database_Manager(db_name=db_name)
+    db_url = os.getenv("DATABASE_URL")
+    model = Database_Manager(database_url=db_url)
     money_mate = MoneyMate(model)
 
     # create the bot application (object)

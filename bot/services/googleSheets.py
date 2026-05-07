@@ -1,8 +1,9 @@
 import gspread
-
-from .expense import Expense
 from datetime import date
 from dataclasses import dataclass
+
+from .auxFunctions import Spent
+
 
 @dataclass
 class WorkSheet():
@@ -10,7 +11,7 @@ class WorkSheet():
     __workSheet = __gc.open("All time spendings")
     __size = 0
     
-    def sheet_add(self, expense: Expense):
+    def sheet_add(self, expense: Spent):
         spent = [date.today().strftime("%d/%m/%Y %H:%M"), expense.item, expense.amount, expense.category]
         
         self.__workSheet.get_worksheet(0).append_row(spent)

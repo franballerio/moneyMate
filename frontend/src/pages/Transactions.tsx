@@ -10,25 +10,34 @@ const Transactions: React.FC = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-[32px]">
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Transactions</h1>
-            <p className="text-gray-600 mt-1">View and manage all your expenses</p>
+            <h1 className="text-hero-display text-ink tracking-tight mb-2">Transactions</h1>
+            <p className="text-body text-ink-muted-80 max-w-[600px]">
+              View and manage all your expenses in one place.
+            </p>
           </div>
-          <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
-            ➕ Add Expense
-          </button>
-        </div>
 
-        <TransactionsTable
-          expenses={expenses}
-          loading={loading}
-          total={total}
-          onPageChange={setPage}
-          currentPage={page}
-          limit={limit}
-        />
+          <button className="btn-primary h-[44px] flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Expense
+          </button>
+        </header>
+
+        <section>
+          <TransactionsTable
+            expenses={expenses}
+            loading={loading}
+            total={total}
+            onPageChange={setPage}
+            currentPage={page}
+            limit={limit}
+          />
+        </section>
       </div>
     </Layout>
   );
